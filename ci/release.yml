@@ -48,7 +48,8 @@ jobs:
           CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: |
-          echo "$CERT_P12" | base64 --decode > cert.p12
+          if [ -z "$CERT_P12" ]; then echo "::error::Нет секрета MACOS_CERT_P12"; exit 1; fi
+          printf "%s" "$CERT_P12" | tr -d ' \r\n\t' | base64 --decode > cert.p12
           KC=signing.keychain-db
           security create-keychain -p ci "$KC"
           security set-keychain-settings -lut 21600 "$KC"
