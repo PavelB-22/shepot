@@ -1,6 +1,6 @@
 [package]
 name = "shepot"
-version = "0.1.4"
+version = "0.1.5"
 description = "Голос в текст — бесплатно и без интернета"
 edition = "2021"
 

@@ -17,8 +17,10 @@ impl Engine {
         Ok(Self { model_id: model_id.into(), ctx })
     }
 
-    /// language: "auto", "ru", "en"
-    pub fn transcribe(&self, audio: &[f32], language: &str) -> anyhow::Result<String> {
+    /// language: "auto", "ru", "en".
+    /// fast=true — быстрый черновой проход для живого режима (обрабатываем только реальную длину звука,
+    /// а не стандартные 30 секунд Whisper — в разы быстрее).
+    pub fn transcribe(&self, audio: &[f32], language: &str, fast: bool) -> anyhow::Result<String> {
         let mut state = self.ctx.create_state().map_err(|e| anyhow::anyhow!("{e:?}"))?;
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(Some(if language == "auto" { "auto" } else { language }));
@@ -32,6 +34,13 @@ impl Engine {
         params.set_suppress_blank(true);
         let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
         params.set_n_threads(threads as i32);
+        if fast {
+            // 1500 «кадров» = 30 с звука; берём столько, сколько реально сказано, + запас
+            let secs = audio.len() as f32 / 16_000.0;
+            let ctx = ((secs / 30.0) * 1500.0) as i32 + 128;
+            params.set_audio_ctx(ctx.clamp(256, 1500));
+            params.set_no_timestamps(true);
+        }
 
         state.full(params, audio).map_err(|e| anyhow::anyhow!("Ошибка распознавания: {e:?}"))?;
 

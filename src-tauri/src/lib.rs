@@ -175,7 +175,7 @@ fn stop_recording(app: &AppHandle) {
 fn live_loop(app: AppHandle, sid: u64) {
     let mut prev: Vec<String> = Vec::new();
     loop {
-        std::thread::sleep(std::time::Duration::from_millis(800));
+        std::thread::sleep(std::time::Duration::from_millis(500));
         let st = app.state::<AppState>();
         {
             let l = st.live.lock().unwrap();
@@ -188,7 +188,7 @@ fn live_loop(app: AppHandle, sid: u64) {
         if snap.len() < audio::TARGET_RATE as usize || !audio::has_voice(&snap) {
             continue; // меньше секунды или тишина
         }
-        let Ok(text) = transcribe_samples(&app, &snap) else { continue };
+        let Ok(text) = transcribe_with(&app, &snap, true) else { continue };
         let words: Vec<String> = text.split_whitespace().map(String::from).collect();
 
         // Субтитры в индикаторе — последние слова
@@ -228,6 +228,10 @@ fn norm(w: &str) -> String {
 }
 
 fn transcribe_samples(app: &AppHandle, samples: &[f32]) -> anyhow::Result<String> {
+    transcribe_with(app, samples, false)
+}
+
+fn transcribe_with(app: &AppHandle, samples: &[f32], fast: bool) -> anyhow::Result<String> {
     let st = app.state::<AppState>();
     let (model, language) = {
         let s = st.settings.lock().unwrap();
@@ -240,7 +244,7 @@ fn transcribe_samples(app: &AppHandle, samples: &[f32]) -> anyhow::Result<String
             .ok_or_else(|| anyhow::anyhow!("Нет модели"))?;
         *engine = Some(transcribe::Engine::load(&model, &path)?);
     }
-    engine.as_ref().unwrap().transcribe(samples, &language)
+    engine.as_ref().unwrap().transcribe(samples, &language, fast)
 }
 
 fn hide_later(app: &AppHandle, ms: u64) {
