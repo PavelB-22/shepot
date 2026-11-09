@@ -55,5 +55,16 @@ fn clean(s: &str) -> String {
             _ => {}
         }
     }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    let mut text = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Whisper на тишине иногда «придумывает» фразы из субтитров — вырезаем их
+    const JUNK: &[&str] = &[
+        "Субтитры сделал", "Субтитры создавал", "Редактор субтитров", "Продолжение следует",
+        "Спасибо за просмотр", "Подписывайтесь на канал", "DimaTorzok", "Thanks for watching",
+    ];
+    for j in JUNK {
+        if let Some(i) = text.find(j) {
+            text.truncate(i);
+        }
+    }
+    text.trim().to_string()
 }

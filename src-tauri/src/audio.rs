@@ -100,6 +100,12 @@ impl Recorder {
         }
     }
 
+    /// Звук, записанный на этот момент (запись продолжается). 16 кГц моно.
+    pub fn snapshot(&self) -> Vec<f32> {
+        let raw = self.samples.lock().unwrap().clone();
+        resample(&raw, self.rate, TARGET_RATE)
+    }
+
     /// Остановить запись и получить звук 16 кГц моно.
     pub fn stop(mut self) -> Vec<f32> {
         let _ = self.stop_tx.send(());

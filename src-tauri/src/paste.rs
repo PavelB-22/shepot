@@ -35,3 +35,10 @@ pub fn copy_text(text: &str) -> anyhow::Result<()> {
     arboard::Clipboard::new()?.set_text(text.to_string())?;
     Ok(())
 }
+
+/// Напечатать текст «как с клавиатуры» — для живого режима, кусочками.
+pub fn type_text(text: &str) -> anyhow::Result<()> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    enigo.text(text).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    Ok(())
+}

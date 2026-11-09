@@ -21,6 +21,15 @@ struct AppState {
     engine: Mutex<Option<transcribe::Engine>>,
     history: Mutex<Vec<String>>,
     busy: Mutex<bool>,
+    live: Mutex<Live>,
+}
+
+/// Живой режим: сколько слов уже вписано в поле в текущей записи.
+#[derive(Default)]
+struct Live {
+    session: u64,
+    active: bool,
+    typed: usize,
 }
 
 impl AppState {
@@ -91,7 +100,19 @@ fn start_recording(app: &AppHandle) {
     match audio::Recorder::start() {
         Ok(r) => {
             *rec = Some(r);
+            drop(rec);
             status(app, "listening", "Слушаю…");
+            if st.settings.lock().unwrap().live {
+                let sid = {
+                    let mut l = st.live.lock().unwrap();
+                    l.session += 1;
+                    l.active = true;
+                    l.typed = 0;
+                    l.session
+                };
+                let app = app.clone();
+                std::thread::spawn(move || live_loop(app, sid));
+            }
         }
         Err(e) => {
             status(app, "error", &e.to_string());
@@ -115,9 +136,21 @@ fn stop_recording(app: &AppHandle) {
         } else {
             transcribe_samples(&app, &samples)
         };
+        // Живой режим выключаем и узнаём, сколько слов он уже вписал
+        let typed = {
+            let mut l = st.live.lock().unwrap();
+            l.active = false;
+            std::mem::take(&mut l.typed)
+        };
         match result {
             Ok(text) if !text.is_empty() => {
-                if let Err(e) = paste::paste_text(&text) {
+                let insert = if typed > 0 {
+                    let rest: Vec<&str> = text.split_whitespace().skip(typed).collect();
+                    if rest.is_empty() { Ok(()) } else { paste::type_text(&format!(" {}", rest.join(" "))) }
+                } else {
+                    paste::paste_text(&text)
+                };
+                if let Err(e) = insert {
                     status(&app, "error", &format!("Не получилось вставить: {e}"));
                     let _ = paste::copy_text(&text);
                 } else {
@@ -134,6 +167,63 @@ fn stop_recording(app: &AppHandle) {
         *st.busy.lock().unwrap() = false;
         hide_later(&app, 900);
     });
+}
+
+/// Живой режим: каждые ~0,8 с распознаём всё сказанное и показываем/вписываем
+/// только «устоявшиеся» слова — те, что не поменялись между двумя проходами.
+fn live_loop(app: AppHandle, sid: u64) {
+    let mut prev: Vec<String> = Vec::new();
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(800));
+        let st = app.state::<AppState>();
+        {
+            let l = st.live.lock().unwrap();
+            if l.session != sid || !l.active { break; }
+        }
+        let snap = match st.recorder.lock().unwrap().as_ref() {
+            Some(r) => r.snapshot(),
+            None => break,
+        };
+        if snap.len() < audio::TARGET_RATE as usize || !audio::has_voice(&snap) {
+            continue; // меньше секунды или тишина
+        }
+        let Ok(text) = transcribe_samples(&app, &snap) else { continue };
+        let words: Vec<String> = text.split_whitespace().map(String::from).collect();
+
+        // Субтитры в индикаторе — последние слова
+        let tail: String = {
+            let t = words.join(" ");
+            let n = t.chars().count();
+            if n > 70 { format!("…{}", t.chars().skip(n - 70).collect::<String>()) } else { t }
+        };
+        let mut l = st.live.lock().unwrap();
+        if l.session != sid || !l.active { break; }
+        if !tail.is_empty() {
+            let _ = app.emit("status", Status { state: "listening".into(), text: tail });
+        }
+
+        // Вписываем в поле только в режиме «нажал-начал / нажал-закончил»:
+        // в режиме «держу клавишу» зажатые ⌘/Ctrl смешались бы с буквами.
+        let toggle = st.settings.lock().unwrap().mode == "toggle";
+        if toggle {
+            let same = words.iter().zip(prev.iter()).take_while(|(a, b)| norm(a) == norm(b)).count();
+            let stable = same.min(words.len().saturating_sub(1)); // последнее слово ещё может поменяться
+            if stable > l.typed {
+                let chunk = words[l.typed..stable].join(" ");
+                let piece = if l.typed > 0 { format!(" {chunk}") } else { chunk };
+                if paste::type_text(&piece).is_ok() {
+                    l.typed = stable;
+                }
+            }
+        }
+        drop(l);
+        prev = words;
+    }
+}
+
+/// Слово без регистра и знаков препинания — чтобы «Привет,» и «привет» считались одним словом.
+fn norm(w: &str) -> String {
+    w.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect()
 }
 
 fn transcribe_samples(app: &AppHandle, samples: &[f32]) -> anyhow::Result<String> {
@@ -273,6 +363,7 @@ pub fn run() {
                 engine: Mutex::new(None),
                 history: Mutex::new(Vec::new()),
                 busy: Mutex::new(false),
+                live: Mutex::new(Live::default()),
             });
 
             if let Err(e) = register_hotkey(app.handle()) {

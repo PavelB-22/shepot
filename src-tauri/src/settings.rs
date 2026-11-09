@@ -16,6 +16,8 @@ pub struct Settings {
     pub autostart: bool,
     /// Прошёл ли человек приветствие
     pub onboarded: bool,
+    /// Показывать/вписывать текст сразу, пока говоришь
+    pub live: bool,
 }
 
 impl Default for Settings {
@@ -27,6 +29,7 @@ impl Default for Settings {
             model: "small".into(),
             autostart: false,
             onboarded: false,
+            live: true,
         }
     }
 }

@@ -34,6 +34,10 @@ function render() {
   $('mode').value = s.mode;
   $('language').value = s.language;
   $('autostart').checked = s.autostart;
+  $('live').checked = s.live;
+  $('liveHint').textContent = !s.live ? '' : s.mode === 'toggle'
+    ? 'Слова появляются прямо в поле, пока говоришь'
+    : 'Слова бегут в подсказке внизу экрана. Чтобы они печатались прямо в поле — выбери «Нажал — начал, нажал — закончил»';
 
   renderModels($('models'));
   renderModels($('onbModels'));
@@ -105,6 +109,7 @@ function renderHistory(list) {
 $('hotkey').onchange = (e) => save({ hotkey: e.target.value });
 $('mode').onchange = (e) => save({ mode: e.target.value });
 $('language').onchange = (e) => save({ language: e.target.value });
+$('live').onchange = (e) => save({ live: e.target.checked });
 $('autostart').onchange = (e) => save({ autostart: e.target.checked });
 $('finishOnb').onclick = () => save({ onboarded: true });
 $('channel').onclick = (e) => { e.preventDefault(); window.__TAURI__.opener.openUrl(CHANNEL_URL); };
