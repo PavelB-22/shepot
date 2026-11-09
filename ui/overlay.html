@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; cursor: default; }
+  body { display: flex; align-items: center; justify-content: center; height: 100vh;
+         font: 600 15px -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .pill { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 999px;
+          background: rgba(20, 22, 28, 0.88); color: #fff; backdrop-filter: blur(12px);
+          box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff4d4f; }
+  .listening .dot { animation: pulse 1s ease-in-out infinite; }
+  .thinking .dot { background: #14c9a4; animation: spin 0.9s linear infinite; border-radius: 3px; }
+  .done .dot { background: #14c9a4; }
+  .error .dot { background: #f5a623; }
+  .bars { display: flex; gap: 3px; align-items: center; height: 16px; }
+  .bars i { width: 3px; background: #fff; border-radius: 2px; animation: bar 0.9s ease-in-out infinite; }
+  .bars i:nth-child(2) { animation-delay: .15s } .bars i:nth-child(3) { animation-delay: .3s }
+  .bars i:nth-child(4) { animation-delay: .45s }
+  .pill:not(.listening) .bars { display: none; }
+  @keyframes pulse { 50% { transform: scale(1.35); opacity: .6 } }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  @keyframes bar { 0%,100% { height: 4px } 50% { height: 16px } }
+</style>
+</head>
+<body>
+  <div class="pill listening" id="pill">
+    <span class="dot"></span>
+    <span id="text">Слушаю…</span>
+    <span class="bars"><i></i><i></i><i></i><i></i></span>
+  </div>
+<script>
+  const pill = document.getElementById('pill');
+  const text = document.getElementById('text');
+  window.__TAURI__.event.listen('status', (e) => {
+    pill.className = 'pill ' + e.payload.state;
+    text.textContent = e.payload.text;
+  });
+</script>
+</body>
+</html>

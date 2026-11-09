@@ -1,0 +1,55 @@
+# Автосборка Shepot для Mac и Windows.
+# Запускается, когда в репозиторий отправлен тег вида v0.1.0.
+# Готовые установщики появляются на странице Releases.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest      # Mac на Apple Silicon (M1/M2/M3/M4)
+            args: --target aarch64-apple-darwin
+            rust_targets: aarch64-apple-darwin
+          - platform: windows-latest    # Windows 10/11
+            args: ''
+            rust_targets: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Shepot ${{ github.ref_name }}'
+          releaseBody: |
+            **Mac:** скачай `.dmg`, перетащи Shepot в «Программы», затем в Терминале:
+            `xattr -dr com.apple.quarantine /Applications/Shepot.app`
+            **Windows:** скачай `.exe`, запусти. Если появится «Windows защитила компьютер» — «Подробнее» → «Выполнить в любом случае».
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

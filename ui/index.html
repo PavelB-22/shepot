@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Shepot</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <img src="icon.png" alt="" class="logo">
+    <div>
+      <h1>Shepot</h1>
+      <p class="muted">Голос в текст. Бесплатно и без интернета.</p>
+    </div>
+  </header>
+
+  <!-- Приветствие -->
+  <section id="onboarding" hidden>
+    <div class="step">
+      <span class="num">1</span>
+      <div>
+        <h2>Выбери качество распознавания</h2>
+        <p class="muted">Модель скачается один раз. Дальше всё работает без интернета — голос никуда не отправляется.</p>
+      </div>
+    </div>
+    <div class="models" id="onbModels"></div>
+    <div class="step">
+      <span class="num">2</span>
+      <div>
+        <h2>Попробуй</h2>
+        <p>Поставь курсор в любое поле, <b>зажми <kbd class="hk"></kbd></b>, скажи фразу и отпусти.</p>
+        <p class="muted mac-only">На Маке разреши доступ к <b>микрофону</b> и <b>«Универсальному доступу»</b>, когда система спросит, — без этого текст не вставится.</p>
+      </div>
+    </div>
+    <button class="primary" id="finishOnb">Всё понятно</button>
+  </section>
+
+  <!-- Основной экран -->
+  <section id="main" hidden>
+    <nav>
+      <button data-tab="settings" class="active">Настройки</button>
+      <button data-tab="history">История</button>
+    </nav>
+
+    <div class="tab" id="tab-settings">
+      <label class="row">
+        <span>Горячая клавиша</span>
+        <select id="hotkey"></select>
+      </label>
+      <label class="row">
+        <span>Как записывать</span>
+        <select id="mode">
+          <option value="hold">Держу клавишу, пока говорю</option>
+          <option value="toggle">Нажал — начал, нажал — закончил</option>
+        </select>
+      </label>
+      <label class="row">
+        <span>Язык</span>
+        <select id="language">
+          <option value="auto">Определять сам</option>
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <label class="row">
+        <span>Запускать вместе с компьютером</span>
+        <input type="checkbox" id="autostart" class="switch">
+      </label>
+      <p class="error" id="err"></p>
+      <h3>Качество</h3>
+      <div class="models" id="models"></div>
+    </div>
+
+    <div class="tab" id="tab-history" hidden>
+      <p class="muted" id="histEmpty">Здесь появятся последние 20 расшифровок.</p>
+      <ul id="history"></ul>
+    </div>
+  </section>
+
+  <footer>
+    <a href="#" id="channel">📣 Новые бесплатные программы — в нашем Telegram-канале</a>
+  </footer>
+<script src="app.js"></script>
+</body>
+</html>
