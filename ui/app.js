@@ -35,6 +35,8 @@ function render() {
   $('language').value = s.language;
   $('autostart').checked = s.autostart;
   $('live').checked = s.live;
+  $('autoUpdate').checked = s.auto_update;
+  $('ver').textContent = state.version;
   $('liveHint').textContent = !s.live ? '' : s.mode === 'toggle'
     ? 'Слова появляются прямо в поле, пока говоришь'
     : 'Слова бегут в подсказке внизу экрана. Чтобы они печатались прямо в поле — выбери «Нажал — начал, нажал — закончил»';
@@ -109,6 +111,16 @@ function renderHistory(list) {
 $('hotkey').onchange = (e) => save({ hotkey: e.target.value });
 $('mode').onchange = (e) => save({ mode: e.target.value });
 $('language').onchange = (e) => save({ language: e.target.value });
+$('autoUpdate').onchange = (e) => save({ auto_update: e.target.checked });
+$('checkUpd').onclick = async (e) => {
+  e.preventDefault();
+  $('updMsg').textContent = '— проверяю…';
+  try {
+    const v = await invoke('update_now');
+    $('updMsg').textContent = v ? `— ставлю ${v}, программа перезапустится` : '— у тебя последняя версия ✓';
+  } catch (err) { $('updMsg').textContent = '— ' + err; }
+};
+listen('update', (e) => { $('updMsg').textContent = `— скачиваю версию ${e.payload.version}…`; });
 $('live').onchange = (e) => save({ live: e.target.checked });
 $('autostart').onchange = (e) => save({ autostart: e.target.checked });
 $('finishOnb').onclick = () => save({ onboarded: true });

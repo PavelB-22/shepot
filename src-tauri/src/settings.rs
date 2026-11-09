@@ -18,6 +18,8 @@ pub struct Settings {
     pub onboarded: bool,
     /// Показывать/вписывать текст сразу, пока говоришь
     pub live: bool,
+    /// Обновляться автоматически
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -30,6 +32,7 @@ impl Default for Settings {
             autostart: false,
             onboarded: false,
             live: true,
+            auto_update: true,
         }
     }
 }

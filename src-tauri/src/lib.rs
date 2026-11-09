@@ -12,6 +12,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
 use tauri_plugin_autostart::ManagerExt as AutostartExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_updater::UpdaterExt;
 
 /// Всё, что программа держит в памяти.
 struct AppState {
@@ -279,8 +280,63 @@ fn on_hotkey(app: &AppHandle, state: ShortcutState) {
 
 // ---------- команды для окна ----------
 
+// ---------- автообновление ----------
+
+/// Проверить обновление. install=true — сразу скачать, поставить и перезапустить.
+async fn check_update(app: AppHandle, install: bool) -> Result<Option<String>, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| format!("Не удалось проверить: {e}"))? else {
+        return Ok(None);
+    };
+    let version = update.version.clone();
+    if !install {
+        return Ok(Some(version));
+    }
+    let _ = app.emit("update", serde_json::json!({ "state": "downloading", "version": version }));
+    let bytes = update
+        .download(|_, _| {}, || {})
+        .await
+        .map_err(|e| format!("Не удалось скачать обновление: {e}"))?;
+    // Не перезапускаемся посреди диктовки — ждём, пока человек договорит
+    loop {
+        let st = app.state::<AppState>();
+        let idle = st.recorder.lock().unwrap().is_none() && !*st.busy.lock().unwrap();
+        if idle { break; }
+        tokio_sleep(2000).await;
+    }
+    update.install(bytes).map_err(|e| format!("Не удалось установить: {e}"))?;
+    app.restart();
+}
+
+async fn tokio_sleep(ms: u64) {
+    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+}
+
+/// Фоновая проверка: при запуске и потом раз в 6 часов.
+fn start_auto_update(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio_sleep(15_000).await; // даём программе спокойно стартовать
+        loop {
+            let enabled = app.state::<AppState>().settings.lock().unwrap().auto_update;
+            if enabled {
+                let _ = check_update(app.clone(), true).await;
+            }
+            tokio_sleep(6 * 60 * 60 * 1000).await;
+        }
+    });
+}
+
+#[tauri::command]
+async fn update_now(app: AppHandle) -> Result<String, String> {
+    match check_update(app, true).await? {
+        Some(v) => Ok(v),
+        None => Ok(String::new()),
+    }
+}
+
 #[derive(Serialize)]
 struct UiState {
+    version: String,
     settings: settings::Settings,
     models: Vec<models::ModelView>,
     history: Vec<String>,
@@ -288,8 +344,9 @@ struct UiState {
 }
 
 #[tauri::command]
-fn get_state(st: State<AppState>) -> UiState {
+fn get_state(app: AppHandle, st: State<AppState>) -> UiState {
     UiState {
+        version: app.package_info().version.to_string(),
         settings: st.settings.lock().unwrap().clone(),
         models: models::list(&st.models_dir()),
         history: st.history.lock().unwrap().clone(),
@@ -340,6 +397,7 @@ fn copy_text(text: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -369,6 +427,7 @@ pub fn run() {
             if let Err(e) = register_hotkey(app.handle()) {
                 eprintln!("{e}");
             }
+            start_auto_update(app.handle().clone());
 
             // Иконка в трее / строке меню
             let open = MenuItem::with_id(app, "open", "Настройки и история", true, None::<&str>)?;
@@ -400,7 +459,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_state, save_settings, download_model, copy_text])
+        .invoke_handler(tauri::generate_handler![get_state, save_settings, download_model, copy_text, update_now])
         .build(tauri::generate_context!())
         .expect("не удалось запустить Shepot")
         .run(|app, event| {

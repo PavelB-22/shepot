@@ -1,6 +1,6 @@
 # Автосборка Shepot для Mac и Windows.
 # Запускается, когда в репозиторий отправлен тег вида v0.1.0.
-# Готовые установщики появляются на странице Releases.
+# Готовые установщики и файл обновлений (latest.json) появляются на странице Releases.
 name: Release
 
 on:
@@ -43,13 +43,20 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ключ подписи обновлений — секрет в настройках репозитория
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Shepot ${{ github.ref_name }}'
           releaseBody: |
-            **Mac:** скачай `.dmg`, перетащи Shepot в «Программы», затем в Терминале:
-            `xattr -dr com.apple.quarantine /Applications/Shepot.app`
-            **Windows:** скачай `.exe`, запусти. Если появится «Windows защитила компьютер» — «Подробнее» → «Выполнить в любом случае».
+            **Установка одной строкой (дальше программа обновляется сама):**
+
+            🍏 **Mac** — открой Терминал и вставь:
+            `curl -fsSL https://raw.githubusercontent.com/PavelB-22/shepot/main/install.sh | bash`
+
+            🪟 **Windows** — открой PowerShell и вставь:
+            `irm https://raw.githubusercontent.com/PavelB-22/shepot/main/install.ps1 | iex`
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

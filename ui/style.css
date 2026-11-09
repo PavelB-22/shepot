@@ -43,3 +43,5 @@ select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); ba
 #history li span { flex: 1; } #history li button { border: 0; background: none; cursor: pointer; font-size: 16px; }
 footer { margin-top: 18px; text-align: center; }
 footer a { color: var(--accent-2); text-decoration: none; font-weight: 600; }
+
+.row small a { color: var(--accent-2); }
