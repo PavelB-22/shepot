@@ -40,12 +40,37 @@ jobs:
 
       - run: npm ci
 
+      # Mac: загружаем наш постоянный сертификат подписи.
+      # Тогда macOS считает каждую новую версию «той же программой» и не сбрасывает разрешения.
+      - name: Import signing certificate (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          echo "$CERT_P12" | base64 --decode > cert.p12
+          KC=signing.keychain-db
+          security create-keychain -p ci "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p ci "$KC"
+          security import cert.p12 -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci "$KC"
+          # доверяем сертификату на этой машине сборки, чтобы codesign его принял
+          security find-certificate -c "Shepot Self-Signed" -p "$KC" > cert.pem
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain cert.pem
+          rm -f cert.p12 cert.pem
+          security find-identity -v -p codesigning
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ключ подписи обновлений — секрет в настройках репозитория
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          # Mac: подписывать нашим сертификатом (на Windows пусто — не используется)
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && 'Shepot Self-Signed' || '' }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Shepot ${{ github.ref_name }}'
